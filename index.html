@@ -217,7 +217,7 @@
 <script src="hanzi-writer.min.js"></script>
 <script src="data.js"></script>
 <script>
-const APP_VER = 'v2026.10.31-2';
+const APP_VER = 'v2026.10.31-3';
 document.getElementById('ver').textContent = APP_VER;
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -357,29 +357,31 @@ $('bQuiz').onclick = () => startQuiz([cur], 5, 'hub', cur.w);
 
 // ---------- 故事 ----------
 let pgI = 0, reading = false;
+// 故事最後多一頁「心得」：故事的道理 + 生活上可以怎麼做
+const pgs = () => [...cur.pg, ['心得：' + cur.moral + '　下次可以這樣：' + cur.tip, S('gold', '💡 40 14 30 bounce', '🌟 10 10 14 float', '🌟 80 8 14 float', '🧒 12 40 24 bounce', '👍 66 42 22 bounce')]];
 function openStory() { pgI = 0; reading = false; $('stTitle').innerHTML = zyHTML(cur.w, cur.zy); show('story'); showPage(); }
 function showPage() {
-  const pg = cur.pg[pgI];
+  const pg = pgs()[pgI];
   $('scene').className = 'scene bg-' + pg[1].bg;
   $('scene').innerHTML = pg[1].items.map(it => `<span class="it ${it.a}" style="left:${it.x}%;top:${it.y}%;font-size:${it.z}cqw">${it.e}</span>`).join('');
   $('subBox').innerHTML = kChars(pg[0]);
-  $('dots').textContent = cur.pg.map((_, i) => i === pgI ? '●' : '○').join(' ');
-  $('stPrev').disabled = pgI === 0; $('stNext').disabled = pgI === cur.pg.length - 1;
+  $('dots').textContent = pgs().map((_, i) => i === pgI ? '●' : '○').join(' ');
+  $('stPrev').disabled = pgI === 0; $('stNext').disabled = pgI === pgs().length - 1;
   $('stRead').textContent = reading ? '⏹ 停止' : '🔊 念給我聽';
-  if (pgI === cur.pg.length - 1) mark(cur.id, 'story');
+  if (pgI === pgs().length - 1) mark(cur.id, 'story');
 }
 function readFrom() {
   reading = true; showPage();
-  karSay(cur.pg[pgI][0], $('subBox'), () => {
+  karSay(pgs()[pgI][0], $('subBox'), () => {
     if (!reading) return;
-    if (pgI < cur.pg.length - 1) setTimeout(() => { if (reading) { pgI++; readFrom(); } }, 700);
+    if (pgI < pgs().length - 1) setTimeout(() => { if (reading) { pgI++; readFrom(); } }, 700);
     else { reading = false; showPage(); }
   });
 }
-function stopReading() { reading = false; karStop(); showPage(); $('subBox').innerHTML = kChars(cur.pg[pgI][0]); }
+function stopReading() { reading = false; karStop(); showPage(); $('subBox').innerHTML = kChars(pgs()[pgI][0]); }
 $('stRead').onclick = () => reading ? stopReading() : readFrom();
 $('stPrev').onclick = () => { reading = false; karStop(); pgI = Math.max(0, pgI - 1); showPage(); };
-$('stNext').onclick = () => { reading = false; karStop(); pgI = Math.min(cur.pg.length - 1, pgI + 1); showPage(); };
+$('stNext').onclick = () => { reading = false; karStop(); pgI = Math.min(pgs().length - 1, pgI + 1); showPage(); };
 
 // ---------- 認識成語 ----------
 function openKnow() {

@@ -221,7 +221,7 @@
 <script src="hanzi-writer.min.js"></script>
 <script src="data.js"></script>
 <script>
-const APP_VER = 'v2026.10.31-6';
+const APP_VER = 'v2026.10.31-7';
 document.getElementById('ver').textContent = APP_VER;
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -269,6 +269,9 @@ if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged 
 let karTimer = null, karToken = 0;
 function karStop() { karToken++; clearInterval(karTimer); karTimer = null; if ('speechSynthesis' in window) speechSynthesis.cancel(); }
 let karPos = 0;
+const PUNC = /[「」『』“”‘’"'（）()《》〈〉【】—─…，。！？；：、,.!?;:~～]/;
+// 唸出聲的文字：拿掉標點和引號（字幕還是照原來的字掃），並記下每個字對應字幕的第幾個字
+function spoken(t) { let out = '', map = []; Array.from(t).forEach((c, i) => { if (!PUNC.test(c)) { out += c; map.push(i); } }); return { out, map }; }
 function karShow(box, n) { karPos = n; box.querySelectorAll('.c').forEach((w, i) => { w.classList.toggle('done', i < n); w.classList.toggle('now', i === n); }); }
 let msPerChar = 300;   // 每個字大約唸幾毫秒：每唸完一句就用實際時間修正
 function karSay(text, box, onEnd, from = 0) {   // 一個分句一個分句唸；每句唸完字幕就對齊句尾，不會越差越多
@@ -288,7 +291,8 @@ function karSay(text, box, onEnd, from = 0) {   // 一個分句一個分句唸�
     const n = clauses[ci], start = base, t = clauseText[ci];
     let gotB = false, t0 = 0;
     if (box) karShow(box, start);
-    const u = new SpeechSynthesisUtterance(t); u.lang = 'zh-TW'; u.rate = .72; u.pitch = 1.1; if (voice) u.voice = voice;
+    const sp = spoken(t); if (!sp.out) { base = start + n; ci++; next(); return; }
+    const u = new SpeechSynthesisUtterance(sp.out); u.lang = 'zh-TW'; u.rate = .72; u.pitch = 1.1; if (voice) u.voice = voice;
     u.onstart = () => {
       t0 = performance.now(); clearInterval(karTimer);
       if (!box) return;
@@ -299,7 +303,7 @@ function karSay(text, box, onEnd, from = 0) {   // 一個分句一個分句唸�
         karShow(box, start + k);
       }, 50);
     };
-    u.onboundary = e => { if (my !== karToken || !box) return; gotB = true; karShow(box, start + Math.min(n - 1, e.charIndex)); };
+    u.onboundary = e => { if (my !== karToken || !box) return; gotB = true; karShow(box, start + Math.min(n - 1, sp.map[Math.min(sp.map.length - 1, e.charIndex)] || 0)); };
     const done = () => {
       if (my !== karToken) return;
       clearInterval(karTimer);
@@ -314,7 +318,7 @@ function karSay(text, box, onEnd, from = 0) {   // 一個分句一個分句唸�
     karTimer = setInterval(() => { const f = (performance.now() - t0) / total; karShow(box, Math.min(cs.length, Math.floor(f * cs.length))); if (f >= 1) finish(); }, 60);
   }
 }
-const sayPlain = t => { karStop(); if (!('speechSynthesis' in window)) return; const u = new SpeechSynthesisUtterance(t); u.lang = 'zh-TW'; u.rate = .8; if (voice) u.voice = voice; speechSynthesis.speak(u); };
+const sayPlain = t => { karStop(); if (!('speechSynthesis' in window)) return; const u = new SpeechSynthesisUtterance(spoken(t).out); u.lang = 'zh-TW'; u.rate = .8; if (voice) u.voice = voice; speechSynthesis.speak(u); };
 const kChars = t => Array.from(t).map(c => `<span class="c">${esc(c)}</span>`).join('');
 
 // ---------- 畫面切換 ----------

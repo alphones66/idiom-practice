@@ -217,7 +217,7 @@
 <script src="hanzi-writer.min.js"></script>
 <script src="data.js"></script>
 <script>
-const APP_VER = 'v2026.10.31-1';
+const APP_VER = 'v2026.10.31-2';
 document.getElementById('ver').textContent = APP_VER;
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -265,29 +265,47 @@ if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged 
 let karTimer = null, karToken = 0;
 function karStop() { karToken++; clearInterval(karTimer); karTimer = null; if ('speechSynthesis' in window) speechSynthesis.cancel(); }
 function karShow(box, n) { box.querySelectorAll('.c').forEach((w, i) => { w.classList.toggle('done', i < n); w.classList.toggle('now', i === n); }); }
-function karSay(text, box, onEnd) {   // 唸 text，同時讓 box 裡的字一個一個變色
+let msPerChar = 300;   // 每個字大約唸幾毫秒：每唸完一句就用實際時間修正
+function karSay(text, box, onEnd) {   // 一個分句一個分句唸；每句唸完字幕就對齊句尾，不會越差越多
   karStop();
   const my = karToken, cs = box ? [...box.querySelectorAll('.c')] : [];
-  const chars = Array.from(text);
-  if (box) karShow(box, 0);
-  const end = () => { if (my !== karToken) return; clearInterval(karTimer); if (box) karShow(box, 999); if (onEnd) onEnd(); };
-  if (!('speechSynthesis' in window)) { sweep(); return; }
-  const u = new SpeechSynthesisUtterance(text); u.lang = 'zh-TW'; u.rate = .72; u.pitch = 1.1; if (voice) u.voice = voice;
-  let gotB = false;
-  const startSweep = () => { if (!gotB && my === karToken && box) sweep(); };
-  u.onstart = () => setTimeout(startSweep, 500);
-  u.onboundary = e => {
-    if (my !== karToken || !box) return;
-    gotB = true; clearInterval(karTimer);
-    // charIndex 是第幾個字元；中文每個字元對應一個 .c（標點也是）
-    karShow(box, Math.min(chars.length - 1, e.charIndex));
-  };
-  u.onend = end; u.onerror = () => { if (!gotB) end(); };
-  speechSynthesis.speak(u);
-  function sweep() {   // 裝置不回報唸到哪裡時，用預估時間平均掃過
-    clearInterval(karTimer);
-    const t0 = performance.now(), total = chars.length * 330;
-    karTimer = setInterval(() => { if (my !== karToken) { clearInterval(karTimer); return; } const f = (performance.now() - t0) / total; karShow(box, Math.min(cs.length, Math.floor(f * cs.length))); if (f >= 1) clearInterval(karTimer); }, 60);
+  const clauses = (text.match(/[^，。！？；：、]+[，。！？；：、]*/g) || [text]).map(t => Array.from(t).length);
+  let ci = 0, base = 0;
+  const finish = () => { if (my !== karToken) return; clearInterval(karTimer); if (box) karShow(box, 999); if (onEnd) onEnd(); };
+  if (!('speechSynthesis' in window)) { box ? fakeAll() : finish(); return; }
+  const clauseText = [], arr = Array.from(text); let pos = 0;
+  clauses.forEach(n => { clauseText.push(arr.slice(pos, pos + n).join('')); pos += n; });
+  next();
+  function next() {
+    if (my !== karToken) return;
+    if (ci >= clauses.length) { finish(); return; }
+    const n = clauses[ci], start = base, t = clauseText[ci];
+    let gotB = false, t0 = 0;
+    if (box) karShow(box, start);
+    const u = new SpeechSynthesisUtterance(t); u.lang = 'zh-TW'; u.rate = .72; u.pitch = 1.1; if (voice) u.voice = voice;
+    u.onstart = () => {
+      t0 = performance.now(); clearInterval(karTimer);
+      if (!box) return;
+      karTimer = setInterval(() => {   // 語音沒回報位置時，照預估速度掃，但不會超過這一句的最後一個字
+        if (my !== karToken) { clearInterval(karTimer); return; }
+        if (gotB) return;
+        const k = Math.min(n - 1, Math.floor((performance.now() - t0) / msPerChar));
+        karShow(box, start + k);
+      }, 50);
+    };
+    u.onboundary = e => { if (my !== karToken || !box) return; gotB = true; karShow(box, start + Math.min(n - 1, e.charIndex)); };
+    const done = () => {
+      if (my !== karToken) return;
+      clearInterval(karTimer);
+      if (t0) { const per = (performance.now() - t0) / n; if (per > 80 && per < 900) msPerChar = msPerChar * .5 + per * .5; }
+      base = start + n; ci++; next();
+    };
+    u.onend = done; u.onerror = done;
+    speechSynthesis.speak(u);
+  }
+  function fakeAll() {
+    const t0 = performance.now(), total = arr.length * msPerChar;
+    karTimer = setInterval(() => { const f = (performance.now() - t0) / total; karShow(box, Math.min(cs.length, Math.floor(f * cs.length))); if (f >= 1) finish(); }, 60);
   }
 }
 const sayPlain = t => { karStop(); if (!('speechSynthesis' in window)) return; const u = new SpeechSynthesisUtterance(t); u.lang = 'zh-TW'; u.rate = .8; if (voice) u.voice = voice; speechSynthesis.speak(u); };

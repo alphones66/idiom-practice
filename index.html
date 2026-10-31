@@ -175,8 +175,9 @@
 <div class="screen" id="know">
   <button class="round-btn" data-go="hub">⬅️</button>
   <div class="idiom-title" id="knTitle"></div>
-  <div class="card"><h4>💡 意思</h4><p id="knMean"></p><div class="row" style="justify-content:flex-start"><button class="pill" id="knSay">🔊 唸一唸</button></div></div>
-  <div class="card"><h4>📚 故事告訴我們</h4><p id="knMoral"></p><p style="font-size:18px;color:#8a6d57" id="knFrom"></p></div>
+  <div class="row"><button class="pill" id="knSayW">🔊 唸成語</button></div>
+  <div class="card"><h4>💡 意思</h4><div class="note"><button class="say" id="knSay">🔊</button><p id="knMean" style="margin:0"></p></div></div>
+  <div class="card"><h4>📚 故事告訴我們</h4><div class="note"><button class="say" id="knSayM">🔊</button><p id="knMoral" style="margin:0"></p></div><p style="font-size:18px;color:#8a6d57" id="knFrom"></p></div>
   <div class="card"><h4>🔤 生詞解釋</h4><div id="knNotes"></div></div>
   <div class="card"><h4>✏️ 造句範例</h4><div id="knEx"></div></div>
 </div>
@@ -217,7 +218,7 @@
 <script src="hanzi-writer.min.js"></script>
 <script src="data.js"></script>
 <script>
-const APP_VER = 'v2026.10.31-4';
+const APP_VER = 'v2026.10.31-5';
 document.getElementById('ver').textContent = APP_VER;
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -388,12 +389,15 @@ function openKnow() {
   $('knTitle').innerHTML = zyHTML(cur.w, cur.zy);
   $('knMean').textContent = cur.m;
   $('knMoral').textContent = cur.moral; $('knFrom').textContent = '出處：' + cur.from;
-  $('knNotes').innerHTML = cur.notes.map(n => `<div class="note"><button class="say" data-t="${esc(n[0])}">🔊</button><b>${zyHTML(n[0], n[1])}</b><span>${esc(n[2])}</span></div>`).join('');
+  $('knNotes').innerHTML = cur.notes.map(n => `<div class="note"><button class="say" data-t="${esc(n[0] + '。' + n[2])}">🔊</button><b>${zyHTML(n[0], n[1])}</b><span>${esc(n[2])}</span></div>`).join('');
   const hi = s => esc(s).replace(esc(cur.w), `<em>${esc(cur.w)}</em>`);
-  $('knEx').innerHTML = [cur.ex[0], cur.ex[1], cur.mk.join('')].map(s => `<div class="eg">• ${hi(s)}</div>`).join('');
+  $('knEx').innerHTML = [cur.ex[0], cur.ex[1], cur.mk.join('')].map(s => `<div class="note"><button class="say" data-t="${esc(s)}">🔊</button><div class="eg">${hi(s)}</div></div>`).join('');
   mark(cur.id, 'know'); show('know');
 }
 $('knSay').onclick = () => sayPlain(cur.w + '。' + cur.m);
+$('knSayW').onclick = () => sayPlain(cur.w);
+$('knSayM').onclick = () => sayPlain(cur.moral);
+$('knEx').onclick = e => { const b = e.target.closest('.say'); if (b) sayPlain(b.dataset.t); };
 $('knNotes').onclick = e => { const b = e.target.closest('.say'); if (b) sayPlain(b.dataset.t); };
 
 // ---------- 筆順（用教育部標準筆順資料）----------

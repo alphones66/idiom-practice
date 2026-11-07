@@ -1,4 +1,4 @@
-const CACHE = 'idiom-pages-v1';
+const CACHE = 'idiom-pages-v2';
 const FILES = ['./', 'index.html', 'data.js', 'hanzi-writer.min.js', 'idiom-manifest.json', 'idiom-icon-180.png', 'idiom-icon-192.png', 'idiom-icon-512.png'];
 
 self.addEventListener('install', event => {
